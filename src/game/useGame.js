@@ -7,6 +7,7 @@ import {
   POWERUP_DURATION,
   getRound,
   resolveCombat,
+  hydratePokemonData,
 } from './pokemon.js'
 
 const DIRS = {
@@ -15,6 +16,12 @@ const DIRS = {
   left: { x: -1, y: 0 },
   right: { x: 1, y: 0 },
 }
+
+// ---- Névoa "agonia" (v1.2) ----
+const FOG_STRENGTH_DRAIN = 6 // força perdida por passo enquanto o inimigo está na névoa
+const FOG_MIN_STRENGTH = 10 // piso: a força do inimigo não cai abaixo disso
+const FOG_LIFETIME_MS = 6000 // quanto tempo uma mancha de névoa dura
+const FOG_SPAWN_EVERY_MS = 5000 // intervalo entre surgimentos de névoa
 
 /**
  * Composable central do jogo. Encapsula todo o estado e as regras:
@@ -38,10 +45,14 @@ export function useGame() {
     powerActive: false,
     powerTimer: 0, // segundos restantes
     activeSpecies: [], // ids das espécies da rodada
+    fog: new Set(), // células cobertas pela névoa "agonia" ("x,y")
   })
 
   let loopHandle = null
   let lastTick = 0
+  let fogOrigins = [] // pontos candidatos onde a névoa pode surgir
+  let fogSpawnAcc = 0 // acumulador de tempo para spawn de névoa
+  let fogPatches = [] // manchas ativas: { cells: string[], expiresAt }
 
   const totalPellets = computed(() => state.pellets.size)
 
@@ -60,6 +71,12 @@ export function useGame() {
     state.powerTimer = 0
     state.items = parsed.items.map((i) => ({ ...i, taken: false }))
 
+    // névoa "agonia" reseta a cada rodada
+    fogOrigins = parsed.fogOrigins
+    fogPatches = []
+    fogSpawnAcc = 0
+    state.fog = new Set()
+
     // até 3 espécies da rodada, distribuídas nos spawns
     const cfg = getRound(roundNumber)
     state.activeSpecies = cfg.species
@@ -71,18 +88,28 @@ export function useGame() {
         species: speciesId,
         x: spawn.x,
         y: spawn.y,
-        strength: p.strength,
+        strength: p.strength, // força atual (pode cair na névoa)
+        maxStrength: p.strength, // força original da espec (para exibir % / recuperar)
+        image: p.image, // sprite da PokeAPI (pode ser null -> fallback emoji)
         alive: true,
       }
     })
   }
 
-  function start() {
+  async function start() {
     state.status = 'running'
     state.round = 1
     state.score = 0
     state.lives = 3
     state.pacman.strength = PACMAN_BASE_STRENGTH
+
+    // busca sprites/nomes reais da PokeAPI (tolerante a falha; força continua da espec)
+    try {
+      await hydratePokemonData()
+    } catch {
+      /* offline: segue com emojis de fallback */
+    }
+
     loadRound(state.round)
     lastTick = performance.now()
     tickLoop()
@@ -151,6 +178,61 @@ export function useGame() {
     state.powerActive = true
     state.powerTimer = POWERUP_DURATION
     state.score += 100
+  }
+
+  // ---- Névoa "agonia" (v1.2) ----
+  // Surge periodicamente numa origem candidata, cobrindo a célula e as
+  // células de caminho adjacentes. Enquanto um inimigo está sobre a névoa,
+  // sua força é drenada a cada passo (com piso). A névoa some após um tempo.
+
+  function neighborsPath(x, y) {
+    const cells = [`${x},${y}`]
+    for (const d of Object.values(DIRS)) {
+      const nx = x + d.x
+      const ny = y + d.y
+      if (!isWall(state.grid, nx, ny)) cells.push(`${nx},${ny}`)
+    }
+    return cells
+  }
+
+  function spawnFog() {
+    if (fogOrigins.length === 0) return
+    const origin = fogOrigins[Math.floor(Math.random() * fogOrigins.length)]
+    const cells = neighborsPath(origin.x, origin.y)
+    fogPatches.push({ cells, expiresAt: performance.now() + FOG_LIFETIME_MS })
+    rebuildFogSet()
+  }
+
+  function rebuildFogSet() {
+    const set = new Set()
+    for (const patch of fogPatches) for (const c of patch.cells) set.add(c)
+    state.fog = set
+  }
+
+  function updateFog(dt) {
+    // expira manchas antigas
+    const now = performance.now()
+    const before = fogPatches.length
+    fogPatches = fogPatches.filter((p) => p.expiresAt > now)
+    if (fogPatches.length !== before) rebuildFogSet()
+
+    // spawn periódico
+    fogSpawnAcc += dt
+    if (fogSpawnAcc >= FOG_SPAWN_EVERY_MS) {
+      fogSpawnAcc = 0
+      spawnFog()
+    }
+  }
+
+  /** Drena força dos inimigos que estão dentro da névoa (com piso). */
+  function applyFogDrain() {
+    if (state.fog.size === 0) return
+    for (const e of state.enemies) {
+      if (!e.alive) continue
+      if (state.fog.has(`${e.x},${e.y}`)) {
+        e.strength = Math.max(FOG_MIN_STRENGTH, e.strength - FOG_STRENGTH_DRAIN)
+      }
+    }
   }
 
   function moveEnemies() {
@@ -241,11 +323,15 @@ export function useGame() {
         }
       }
 
+      // névoa "agonia": spawn/expiração acontece em tempo real (não por passo)
+      if (state.status === 'running') updateFog(dt)
+
       while (acc >= STEP_MS) {
         acc -= STEP_MS
         if (state.status === 'running') {
           movePacman()
           moveEnemies()
+          applyFogDrain()
           checkCollisions()
         }
       }

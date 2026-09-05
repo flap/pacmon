@@ -28,6 +28,10 @@ const pelletList = computed(() => Array.from(props.state.pellets).map((k) => {
   const [x, y] = k.split(',').map(Number)
   return { x, y, k }
 }))
+const fogList = computed(() => Array.from(props.state.fog).map((k) => {
+  const [x, y] = k.split(',').map(Number)
+  return { x, y, k }
+}))
 </script>
 
 <template>
@@ -51,6 +55,14 @@ const pelletList = computed(() => Array.from(props.state.pellets).map((k) => {
       :style="{ left: px(p.x), top: px(p.y) }"
     />
 
+    <!-- névoa "agonia": camada visual sobre as células afetadas -->
+    <div
+      v-for="f in fogList"
+      :key="`fog-${f.k}`"
+      class="fog"
+      :style="{ left: px(f.x), top: px(f.y), width: px(1), height: px(1) }"
+    />
+
     <!-- itens: boné e pokébola -->
     <div
       v-for="(item, i) in visibleItems"
@@ -61,7 +73,7 @@ const pelletList = computed(() => Array.from(props.state.pellets).map((k) => {
       {{ item.kind === 'cap' ? '🧢' : '⚪' }}
     </div>
 
-    <!-- inimigos pokemon -->
+    <!-- inimigos pokemon (sprite da PokeAPI, com fallback emoji) -->
     <div
       v-for="e in visibleEnemies"
       :key="e.id"
@@ -70,7 +82,15 @@ const pelletList = computed(() => Array.from(props.state.pellets).map((k) => {
       :style="{ left: px(e.x), top: px(e.y) }"
       :title="`${POKEMON[e.species].name} (força ${e.strength})`"
     >
-      {{ POKEMON[e.species].sprite }}
+      <img v-if="e.image" :src="e.image" :alt="POKEMON[e.species].name" class="enemy__sprite" />
+      <span v-else class="enemy__emoji">{{ POKEMON[e.species].sprite }}</span>
+      <!-- barra de força (cai quando a névoa drena) -->
+      <span class="enemy__hp">
+        <span
+          class="enemy__hp-fill"
+          :style="{ width: Math.round((e.strength / e.maxStrength) * 100) + '%' }"
+        />
+      </span>
     </div>
 
     <!-- pacman -->
@@ -119,6 +139,49 @@ const pelletList = computed(() => Array.from(props.state.pellets).map((k) => {
   z-index: var(--pm-z-entities);
 }
 .enemy.frightened { filter: hue-rotate(180deg) brightness(0.8); }
+
+/* sprite da PokeAPI dentro do inimigo */
+.enemy { flex-direction: column; }
+.enemy__sprite {
+  width: 22px; height: 22px;
+  object-fit: contain;
+  image-rendering: auto;
+  filter: drop-shadow(0 0 3px rgba(0,0,0,0.6));
+}
+.enemy__emoji { font-size: 18px; line-height: 1; }
+.enemy__hp {
+  position: absolute;
+  bottom: 0; left: 3px; right: 3px;
+  height: 3px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.enemy__hp-fill {
+  display: block;
+  height: 100%;
+  background: var(--pm-success);
+  transition: width var(--pm-dur-fast) linear;
+}
+
+/* névoa "agonia" */
+.fog {
+  position: absolute;
+  z-index: var(--pm-z-entities);
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    rgba(150, 90, 200, 0.55),
+    rgba(90, 40, 130, 0.35)
+  );
+  border-radius: 6px;
+  animation: fog-drift var(--pm-dur-slow) ease-in-out infinite alternate;
+  box-shadow: 0 0 10px rgba(150, 90, 200, 0.5);
+}
+@keyframes fog-drift {
+  from { opacity: 0.5; transform: scale(0.92); }
+  to { opacity: 0.85; transform: scale(1.04); }
+}
 .pacman__body {
   width: 18px; height: 18px;
   background: var(--pm-color-pacman);

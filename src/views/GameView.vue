@@ -50,7 +50,7 @@ onUnmounted(() => {
   <main class="game">
     <header class="game__header">
       <h1 class="game__title pm-display">PacMon ⚡</h1>
-      <p class="pm-text-secondary">Pacman com Pokémons — capture pela força, ative a pokébola com o boné do Ash</p>
+      <p class="pm-text-secondary">Pacman com Pokémons — capture pela força, ative a pokébola com o boné do Ash. Cuidado: a névoa <strong>agonia</strong> enfraquece quem passa por ela.</p>
     </header>
 
     <div class="game__layout">
@@ -87,6 +87,18 @@ onUnmounted(() => {
             />
           </div>
         </PmPanel>
+
+        <PmPanel title="Névoa Agonia">
+          <div class="fog-status" :class="{ 'is-active': state.fog.size > 0 }">
+            <span class="fog-status__dot" />
+            <span class="pm-display fog-status__label">
+              {{ state.fog.size > 0 ? 'ATIVA' : 'DISSIPADA' }}
+            </span>
+          </div>
+          <p class="hint pm-text-muted">
+            A névoa 🟣 surge pelo mapa e drena a força dos Pokémons que a atravessam.
+          </p>
+        </PmPanel>
       </aside>
 
       <!-- Tabuleiro -->
@@ -115,7 +127,7 @@ onUnmounted(() => {
 
 <style scoped>
 .game {
-  max-width: 900px;
+  max-width: 1040px;
   margin: 0 auto;
   padding: var(--pm-space-8) var(--pm-space-4);
   display: flex;
@@ -140,6 +152,25 @@ onUnmounted(() => {
 .hud-stats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--pm-space-4); }
 .species { display: flex; flex-direction: column; gap: var(--pm-space-2); align-items: flex-start; }
 .hint { font-size: var(--pm-fs-sm); margin-top: var(--pm-space-3); }
+.fog-status {
+  display: flex;
+  align-items: center;
+  gap: var(--pm-space-2);
+}
+.fog-status__dot {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--pm-text-muted);
+  transition: all var(--pm-dur-normal) var(--pm-ease);
+}
+.fog-status.is-active .fog-status__dot {
+  background: #9a5ac8;
+  box-shadow: 0 0 10px #9a5ac8;
+  animation: pulse-dot 1s infinite alternate;
+}
+.fog-status__label { font-size: var(--pm-fs-xs); color: var(--pm-text-secondary); }
+.fog-status.is-active .fog-status__label { color: #c99af0; }
+@keyframes pulse-dot { from { transform: scale(1); } to { transform: scale(1.3); } }
 .game__stage { position: relative; }
 .overlay {
   position: absolute;
