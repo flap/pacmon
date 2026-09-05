@@ -1,0 +1,77 @@
+/* ============================================================
+   PacMon Design System — Base / Reset / Utilitarios
+   Depende de tokens.css
+   ============================================================ */
+
+@import './tokens.css';
+
+/* Fonte arcade (opcional; degrada para monospace se offline) */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family: var(--pm-font-body);
+  font-size: var(--pm-fs-md);
+  line-height: var(--pm-lh-normal);
+  color: var(--pm-text-primary);
+  background: var(--pm-bg-void);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#app {
+  min-height: 100%;
+}
+
+/* ---------- Tipografia utilitaria ---------- */
+.pm-display {
+  font-family: var(--pm-font-display);
+  line-height: var(--pm-lh-tight);
+  letter-spacing: 0.02em;
+}
+
+.pm-text-secondary { color: var(--pm-text-secondary); }
+.pm-text-muted { color: var(--pm-text-muted); }
+
+/* ---------- Layout utilitario ---------- */
+.pm-stack { display: flex; flex-direction: column; gap: var(--pm-space-4); }
+.pm-row { display: flex; align-items: center; gap: var(--pm-space-3); }
+.pm-center { display: flex; align-items: center; justify-content: center; }
+
+/* ---------- Acessibilidade ---------- */
+.pm-visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 3px solid var(--pm-color-pacman);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
